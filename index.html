@@ -199,6 +199,8 @@
                                             <i class="ph ph-credit-card"></i>
                                         </div>
                                     </div>
+                                    <!-- Added Error Message -->
+                                    <div id="card-error-msg" class="text-xs text-red-500 mt-1 h-4 opacity-0 transition-opacity font-medium">Invalid card number</div>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-4">
@@ -331,7 +333,8 @@
     </div>
 
     <script>
-        let currentTotal = 99.00;
+        // Updated to match the displayed price in HTML
+        let currentTotal = 200.00; 
         let discountApplied = false;
         let isMobile = window.innerWidth < 1024;
 
@@ -347,7 +350,35 @@
         const mobileBtnText = document.getElementById('mobile-btn-text');
         const btnText = document.getElementById('btn-text');
 
-        // Card Number Formatting & Brand Detection
+        // --- Luhn Algorithm Function ---
+        function luhnCheck(value) {
+            // Remove spaces and non-digits
+            const val = value.replace(/\D/g, '');
+            
+            // Check length (Visa/MC/Amex etc are usually 13-19 digits)
+            if (val.length < 13 || val.length > 19) return false;
+
+            let sum = 0;
+            let shouldDouble = false;
+
+            // Loop through values starting from the rightmost digit
+            for (let i = val.length - 1; i >= 0; i--) {
+                let digit = parseInt(val.charAt(i));
+
+                if (shouldDouble) {
+                    digit *= 2;
+                    if (digit > 9) digit -= 9;
+                }
+
+                sum += digit;
+                shouldDouble = !shouldDouble;
+            }
+
+            // If the sum modulo 10 is 0, the number is valid
+            return (sum % 10) === 0;
+        }
+
+        // Card Number Formatting & Real-time Validation
         function formatCardNumber(input) {
             let value = input.value.replace(/\D/g, '');
             let formattedValue = '';
@@ -357,8 +388,10 @@
             }
             input.value = formattedValue;
 
-            // Simple Brand Detection
             const cleanValue = value;
+            const errorMsg = document.getElementById('card-error-msg');
+
+            // Simple Brand Detection
             if (cleanValue.startsWith('4')) {
                 updateBrand('visa');
             } else if (cleanValue.startsWith('5') || cleanValue.startsWith('2')) {
@@ -367,6 +400,28 @@
                 updateBrand('amex');
             } else {
                 updateBrand('default');
+            }
+
+            // --- Real-time Validation Logic ---
+            // Only validate if user has typed at least 4 digits to avoid early errors
+            if (cleanValue.length > 4) {
+                const isValid = luhnCheck(cleanValue);
+
+                if (!isValid) {
+                    // Invalid State
+                    input.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500/10');
+                    input.classList.remove('border-green-500', 'focus:border-green-500', 'focus:ring-green-500/10');
+                    errorMsg.classList.remove('opacity-0');
+                } else {
+                    // Valid State
+                    input.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500/10');
+                    input.classList.add('border-green-500', 'focus:border-green-500', 'focus:ring-green-500/10');
+                    errorMsg.classList.add('opacity-0');
+                }
+            } else {
+                // Reset to Neutral
+                input.classList.remove('border-red-500', 'focus:border-red-500', 'focus:ring-red-500/10', 'border-green-500', 'focus:border-green-500', 'focus:ring-green-500/10');
+                errorMsg.classList.add('opacity-0');
             }
         }
 
@@ -414,10 +469,10 @@
                 const newTotal = currentTotal - discountVal;
 
                 discountRow.classList.remove('hidden');
-                discountAmount.textContent = `-$${discountVal.toFixed(2)}`;
-                totalDisplay.textContent = `$${newTotal.toFixed(2)}`;
-                btnText.textContent = `Pay $${newTotal.toFixed(2)}`;
-                mobileBtnText.textContent = `Pay $${newTotal.toFixed(2)}`;
+                discountAmount.textContent = `-£${discountVal.toFixed(2)}`;
+                totalDisplay.textContent = `£${newTotal.toFixed(2)}`;
+                btnText.textContent = `Pay £${newTotal.toFixed(2)}`;
+                mobileBtnText.textContent = `Pay £${newTotal.toFixed(2)}`;
                 
                 promoMessage.textContent = "Code applied successfully!";
                 promoMessage.className = "h-5 mt-1 text-xs font-medium text-green-600";
@@ -450,9 +505,24 @@
             }
         }
 
-        // Form Submission Simulation
+        // Form Submission with Validation Block
         function handleSubmit(e) {
             e.preventDefault();
+
+            // --- NEW: Block Invalid Cards ---
+            const cardInput = document.getElementById('card-number');
+            if (!luhnCheck(cardInput.value)) {
+                // Shake and show error
+                shakeElement(cardInput);
+                
+                // Ensure error message is visible
+                document.getElementById('card-error-msg').classList.remove('opacity-0');
+                cardInput.classList.add('border-red-500');
+                
+                // Stop function here
+                return; 
+            }
+
             const btn = document.getElementById('pay-button');
             const loader = document.getElementById('btn-loader');
             const txt = document.getElementById('btn-text');
